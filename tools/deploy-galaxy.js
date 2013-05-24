@@ -10,7 +10,7 @@ var getMeteor = function (context) {
   if (! _meteor) {
     _meteor = unipackage.load({
       library: context.library,
-      packages: [ 'livedata' ],
+      packages: [ 'livedata', 'mongo-livedata' ],
       release: context.releaseVersion
     }).meteor.Meteor;
   }
@@ -161,6 +161,34 @@ exports.deploy = function (options) {
 
   process.stderr.write(options.app + ": " +
                        "pushed revision " + result.serial + "\n");
+  // Close the connection to Galaxy (otherwise Node will continue running).
+  galaxy.close();
+};
+
+// options:
+// - context
+// - app
+exports.logs = function (options) {
+  var galaxy = getGalaxy(options.context);
+  // XXX make this a separate logReader service
+
+  // xcxc error if can't find app
+  galaxy._subscribeAndWait("logsForApp", options.app); // xcxc prettySubscribe
+  var Collection = getMeteor().Collection;
+  var Logs = new Collection("logs", galaxy);
+
+  var Log = unipackage.load({
+    library: options.context.library,
+    packages: [ 'logging' ],
+    release: options.context.releaseVersion
+  }).logging.Log;
+
+  Logs.find({}, {sort: {date: 1}}).forEach(function (log) {
+    var parsed = Log.parse(log.obj);
+    if (parsed)
+      console.log(Log.format(parsed, {color: true}));
+  });
+
   // Close the connection to Galaxy (otherwise Node will continue running).
   galaxy.close();
 };
